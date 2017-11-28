@@ -1,7 +1,5 @@
 module VirtualMachine where
 
-import qualified Data.Array as A
-
 data Machine = Machine { instructions   :: Instructions
                        , dataStack      :: [Value] }
                deriving Show
@@ -10,28 +8,25 @@ newMachine :: Instructions -> Machine
 newMachine instructions = Machine instructions []
 
 runMachine :: Machine -> Value
-runMachine (Machine [] dataStack)             = head dataStack
 runMachine (Machine (instr:instrs) dataStack) = runMachine $ Machine instrs (dispatch instr dataStack)
+runMachine (Machine [] dataStack)             = head dataStack
 
--- Instructions
-data Instruction  = Add | Sub | Push Int deriving Show
+data Instruction  = Add | Sub | Mul | Div | Push Int deriving Show
 type Instructions = [Instruction]
 
--- Data stack
 type Value = Int
 type DataStack = [Value]
 
--- Dispatch actions
 dispatch :: Instruction -> DataStack -> DataStack
 
--- Add
-dispatch Add (x:y:rest) = (x + y) : rest
-dispatch Add _          = error "not enough values on stack"
+dispatch Add stack = binaryOperation (+)   stack
+dispatch Sub stack = binaryOperation (-)   stack
+dispatch Mul stack = binaryOperation (*)   stack
+dispatch Div stack = binaryOperation (div) stack
 
--- Sub
-dispatch Sub (x:y:rest) = (x - y) : rest
-dispatch Sub _          = error "not enough values on stack"
-
--- Push
 dispatch (Push x) [] = [x]
 dispatch (Push x) xs = x:xs
+
+binaryOperation :: (Value -> Value -> Value) -> DataStack -> DataStack
+binaryOperation operand (x:y:rest) = (operand x y) : rest
+binaryOperation operand _          = error "not enough values on the stack"
