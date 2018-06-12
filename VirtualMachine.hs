@@ -1,32 +1,45 @@
-module VirtualMachine where
+module VirtualMachine (new, run, Result, Instruction(..)) where
 
-data Machine = Machine { instructions   :: Instructions
-                       , dataStack      :: [Value] }
-               deriving Show
+data Machine a = Machine { instrs :: Instructions a
+                         , stack  :: DataStack a } deriving Show
 
-newMachine :: Instructions -> Machine
-newMachine instructions = Machine instructions []
+data Instruction a  = Add | Sub | Mul | Div | Push a deriving Show
+type Instructions a = [Instruction a]
 
-runMachine :: Machine -> Value
-runMachine (Machine (instr:instrs) dataStack) = runMachine $ Machine instrs (dispatch instr dataStack)
-runMachine (Machine [] dataStack)             = head dataStack
+type DataStack a = [a]
 
-data Instruction  = Add | Sub | Mul | Div | Push Int deriving Show
-type Instructions = [Instruction]
+type Result a = Either String a
 
-type Value = Int
-type DataStack = [Value]
+-- construct a new machine
+new :: (Fractional a) => Instructions a -> Machine a
+new instructions = Machine instructions []
 
-dispatch :: Instruction -> DataStack -> DataStack
+-- evaluate a machine instance
+run :: (Fractional a) => Machine a -> Result (Maybe a)
 
-dispatch Add stack = binaryOperation (+)   stack
-dispatch Sub stack = binaryOperation (-)   stack
-dispatch Mul stack = binaryOperation (*)   stack
-dispatch Div stack = binaryOperation (div) stack
+run (Machine (instr:instrs) stack) = 
+  case dispatch instr stack of
+    Right newStack -> run (Machine instrs newStack)
+    Left err       -> Left err
 
-dispatch (Push x) [] = [x]
-dispatch (Push x) xs = x:xs
+run (Machine [] stack) = Right (safeHead stack)
+  where safeHead []    = Nothing
+        safeHead (x:_) = Just x
 
-binaryOperation :: (Value -> Value -> Value) -> DataStack -> DataStack
-binaryOperation operand (x:y:rest) = (operand x y) : rest
-binaryOperation operand _          = error "not enough values on the stack"
+
+-- dispatch some action to the machiine
+dispatch :: (Fractional a) => Instruction a -> DataStack a -> Result (DataStack a)
+
+dispatch Add stack = binOp (+) stack
+dispatch Sub stack = binOp (-) stack
+dispatch Mul stack = binOp (*) stack
+dispatch Div stack = binOp (/) stack
+
+dispatch (Push x) [] = Right [x]
+dispatch (Push x) xs = Right $ x:xs
+
+-- abstraction over 2-arity operation
+binOp :: (Fractional a) => (a -> a -> a) -> DataStack a -> Result (DataStack a)
+binOp op (x:y:rest) = Right $ (op x y) : rest
+binOp op _          = Left "not enough values on the stack"
+
